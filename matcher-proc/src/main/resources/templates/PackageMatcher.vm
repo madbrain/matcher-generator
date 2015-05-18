@@ -1,0 +1,74 @@
+package ${packageName};
+
+import org.hamcrest.Description;
+import org.hamcrest.DiagnosingMatcher;
+import org.hamcrest.Matcher;
+
+public final class ${packageMatcherName} {
+    
+    private ${packageMatcherName}() {}
+    
+#foreach ($bean in $beans)
+    public interface ${bean.name}Matcher extends Matcher<${bean.typeName}>  {
+#foreach ($property in $bean.properties)
+        ${bean.name}Matcher with${property.capitalName}(Matcher<${property.type}> ${property.name}Matcher);
+#end
+    }
+
+    private static class ${bean.name}MatcherImpl extends DiagnosingMatcher<${bean.typeName}> implements ${bean.name}Matcher {
+
+#foreach ($property in $bean.properties)
+        private Matcher<${property.type}> ${property.name}Matcher;
+#end
+
+        @Override
+        public boolean matches(Object item, Description description) {
+            if (!(item instanceof ${bean.typeName})) {
+                description.appendText(" was not a ${bean.name}");
+                return false;
+            }
+            ${bean.typeName} value = (${bean.typeName}) item;
+            boolean matches = true;
+#foreach ($property in $bean.properties)
+            if (matches && ${property.name}Matcher != null) {
+                matches &= ${property.name}Matcher.matches(value.get${property.capitalName}());
+                if (!matches) {
+                    description.appendText("${property.name} ").appendDescriptionOf(${property.name}Matcher).appendText(" ");
+                    ${property.name}Matcher.describeMismatch(value.get${property.capitalName}(), description);
+                }
+            }
+#end
+            return matches;
+        }
+
+        @Override
+        public void describeTo(Description description) {
+            description.appendText("is a ${bean.name} with {");
+            boolean addComa = false;
+#foreach ($property in $bean.properties)
+            if (${property.name}Matcher != null) {
+            	if (addComa) {
+                    description.appendText(", ");
+                }
+                description.appendText("${property.name} ");
+                ${property.name}Matcher.describeTo(description);
+                addComa = true;
+            }
+#end
+            description.appendText("}");
+        }
+
+#foreach ($property in $bean.properties)
+		@Override
+        public ${bean.name}Matcher with${property.capitalName}(Matcher<${property.type}> ${property.name}Matcher) {
+            this.${property.name}Matcher = ${property.name}Matcher;
+            return this;
+        }
+#end
+    }
+
+    public static ${bean.name}Matcher is${bean.name}() {
+        return new ${bean.name}MatcherImpl();
+    }
+#end
+}
